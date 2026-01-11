@@ -24,26 +24,43 @@ class MultiplayerManager {
         return code;
     }
 
+    getPeerConfig() {
+        return {
+            debug: 1,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+            }
+        };
+    }
+
     async hostGame(playerName) {
         this.isHost = true;
         this.roomCode = this.generateRoomCode();
 
         return new Promise((resolve, reject) => {
-            this.peer = new Peer('nyatetris-' + this.roomCode, {
-                debug: 0
-            });
+            const peerId = 'nyatetris-' + this.roomCode;
+            console.log('Hosting with peer ID:', peerId);
+
+            this.peer = new Peer(peerId, this.getPeerConfig());
 
             this.peer.on('open', (id) => {
+                console.log('Host peer opened with ID:', id);
                 this.localPlayerId = id;
                 this.players.set(id, { name: playerName, isHost: true });
                 resolve(this.roomCode);
             });
 
             this.peer.on('connection', (conn) => {
+                console.log('Incoming connection from:', conn.peer);
                 this.handleConnection(conn);
             });
 
             this.peer.on('error', (err) => {
+                console.error('Host peer error:', err);
                 if (err.type === 'unavailable-id') {
                     // Room code taken, try another
                     this.peer.destroy();
@@ -53,6 +70,11 @@ class MultiplayerManager {
                     reject(err);
                 }
             });
+
+            this.peer.on('disconnected', () => {
+                console.log('Host disconnected, attempting reconnect...');
+                this.peer.reconnect();
+            });
         });
     }
 
@@ -61,36 +83,71 @@ class MultiplayerManager {
         this.roomCode = roomCode.toUpperCase();
 
         return new Promise((resolve, reject) => {
-            this.peer = new Peer(undefined, { debug: 0 });
+            let resolved = false;
+
+            this.peer = new Peer(undefined, this.getPeerConfig());
 
             this.peer.on('open', (id) => {
+                console.log('Joiner peer opened with ID:', id);
                 this.localPlayerId = id;
 
-                const conn = this.peer.connect('nyatetris-' + this.roomCode, {
-                    metadata: { name: playerName }
+                const hostId = 'nyatetris-' + this.roomCode;
+                console.log('Connecting to host:', hostId);
+
+                const conn = this.peer.connect(hostId, {
+                    metadata: { name: playerName },
+                    reliable: true
                 });
 
                 conn.on('open', () => {
-                    this.handleConnection(conn);
-                    resolve();
+                    console.log('Connection opened to host');
+                    if (!resolved) {
+                        resolved = true;
+                        this.handleConnection(conn);
+                        resolve();
+                    }
                 });
 
-                conn.on('error', reject);
+                conn.on('error', (err) => {
+                    console.error('Connection error:', err);
+                    if (!resolved) {
+                        resolved = true;
+                        reject(err);
+                    }
+                });
             });
 
             this.peer.on('error', (err) => {
-                reject(err);
+                console.error('Joiner peer error:', err);
+                if (!resolved) {
+                    resolved = true;
+                    if (err.type === 'peer-unavailable') {
+                        reject(new Error('Room not found. Check the code and make sure the host is waiting.'));
+                    } else {
+                        reject(err);
+                    }
+                }
             });
 
-            setTimeout(() => reject(new Error('Connection timeout')), 10000);
+            setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    reject(new Error('Connection timeout - host may not be available'));
+                }
+            }, 15000);
         });
     }
 
     handleConnection(conn) {
         const peerId = conn.peer;
+        console.log('Handling connection for peer:', peerId, 'Connection open:', conn.open);
 
-        conn.on('open', () => {
+        // For incoming connections (host receiving), connection might already be open
+        // For outgoing connections (joiner connecting), we call this after open event
+
+        const setupConnection = () => {
             this.connections.set(peerId, conn);
+            console.log('Connection stored for peer:', peerId);
 
             if (this.isHost) {
                 // Send current player list to new player
@@ -98,6 +155,7 @@ class MultiplayerManager {
                     id, ...info
                 }));
 
+                console.log('Sending player list to new player:', playerList);
                 conn.send({
                     type: 'playerList',
                     players: playerList
@@ -118,13 +176,21 @@ class MultiplayerManager {
                     this.onPlayerJoin(peerId, playerName);
                 }
             }
-        });
+        };
+
+        if (conn.open) {
+            setupConnection();
+        } else {
+            conn.on('open', setupConnection);
+        }
 
         conn.on('data', (data) => {
+            console.log('Received data from', peerId, ':', data.type);
             this.handleMessage(peerId, data);
         });
 
         conn.on('close', () => {
+            console.log('Connection closed for peer:', peerId);
             this.connections.delete(peerId);
             this.players.delete(peerId);
 
@@ -138,6 +204,10 @@ class MultiplayerManager {
             if (this.onPlayerLeave) {
                 this.onPlayerLeave(peerId);
             }
+        });
+
+        conn.on('error', (err) => {
+            console.error('Connection error for peer:', peerId, err);
         });
     }
 
