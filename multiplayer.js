@@ -26,12 +26,15 @@ class MultiplayerManager {
 
     getPeerConfig() {
         return {
-            debug: 1,
+            host: '0.peerjs.com',
+            port: 443,
+            secure: true,
+            debug: 2,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' }
+                    { urls: 'stun:global.stun.twilio.com:3478' }
                 ]
             }
         };
@@ -80,61 +83,83 @@ class MultiplayerManager {
 
     async joinGame(roomCode, playerName) {
         this.isHost = false;
-        this.roomCode = roomCode.toUpperCase();
+        this.roomCode = roomCode.toUpperCase().trim();
 
         return new Promise((resolve, reject) => {
             let resolved = false;
+            let retryCount = 0;
+            const maxRetries = 2;
 
-            this.peer = new Peer(undefined, this.getPeerConfig());
+            const attemptConnection = () => {
+                this.peer = new Peer(undefined, this.getPeerConfig());
 
-            this.peer.on('open', (id) => {
-                console.log('Joiner peer opened with ID:', id);
-                this.localPlayerId = id;
+                this.peer.on('open', (id) => {
+                    console.log('Joiner peer opened with ID:', id);
+                    this.localPlayerId = id;
 
-                const hostId = 'nyatetris-' + this.roomCode;
-                console.log('Connecting to host:', hostId);
+                    const hostId = 'nyatetris-' + this.roomCode;
+                    console.log('Attempting connection to host:', hostId, '(attempt', retryCount + 1, ')');
 
-                const conn = this.peer.connect(hostId, {
-                    metadata: { name: playerName },
-                    reliable: true
+                    const conn = this.peer.connect(hostId, {
+                        metadata: { name: playerName },
+                        reliable: true,
+                        serialization: 'json'
+                    });
+
+                    const connectionTimeout = setTimeout(() => {
+                        if (!resolved && !conn.open) {
+                            console.log('Connection attempt timed out');
+                            conn.close();
+                            if (retryCount < maxRetries) {
+                                retryCount++;
+                                this.peer.destroy();
+                                console.log('Retrying connection...');
+                                setTimeout(attemptConnection, 1000);
+                            } else {
+                                resolved = true;
+                                reject(new Error('Connection timeout - could not reach host. Check if host is still waiting.'));
+                            }
+                        }
+                    }, 8000);
+
+                    conn.on('open', () => {
+                        clearTimeout(connectionTimeout);
+                        console.log('Connection opened to host!');
+                        if (!resolved) {
+                            resolved = true;
+                            this.handleConnection(conn);
+                            resolve();
+                        }
+                    });
+
+                    conn.on('error', (err) => {
+                        clearTimeout(connectionTimeout);
+                        console.error('Connection error:', err);
+                        if (!resolved) {
+                            resolved = true;
+                            reject(err);
+                        }
+                    });
                 });
 
-                conn.on('open', () => {
-                    console.log('Connection opened to host');
+                this.peer.on('error', (err) => {
+                    console.error('Joiner peer error:', err.type, err);
                     if (!resolved) {
                         resolved = true;
-                        this.handleConnection(conn);
-                        resolve();
+                        if (err.type === 'peer-unavailable') {
+                            reject(new Error('Room "' + this.roomCode + '" not found. Check the code and make sure host is waiting.'));
+                        } else if (err.type === 'network') {
+                            reject(new Error('Network error - check your internet connection'));
+                        } else if (err.type === 'server-error') {
+                            reject(new Error('Server error - PeerJS server may be down, try again'));
+                        } else {
+                            reject(new Error(err.type + ': ' + err.message));
+                        }
                     }
                 });
+            };
 
-                conn.on('error', (err) => {
-                    console.error('Connection error:', err);
-                    if (!resolved) {
-                        resolved = true;
-                        reject(err);
-                    }
-                });
-            });
-
-            this.peer.on('error', (err) => {
-                console.error('Joiner peer error:', err);
-                if (!resolved) {
-                    resolved = true;
-                    if (err.type === 'peer-unavailable') {
-                        reject(new Error('Room not found. Check the code and make sure the host is waiting.'));
-                    } else {
-                        reject(err);
-                    }
-                }
-            });
-
-            setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    reject(new Error('Connection timeout - host may not be available'));
-                }
-            }, 15000);
+            attemptConnection();
         });
     }
 
