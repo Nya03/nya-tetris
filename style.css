@@ -1,0 +1,304 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0a0f;
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.screen {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+}
+
+.screen.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Menu */
+#menu h1 {
+    font-size: 4rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+button {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 2px solid #ff00ff;
+    color: #fff;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 4px;
+}
+
+button:hover {
+    background: linear-gradient(135deg, #ff00ff33, #00ffff33);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+}
+
+.join-section {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+input {
+    background: #1a1a2e;
+    border: 2px solid #00ffff;
+    color: #fff;
+    padding: 1rem;
+    font-size: 1rem;
+    width: 150px;
+    border-radius: 4px;
+}
+
+input::placeholder {
+    color: #666;
+}
+
+#roomInfo {
+    margin-top: 2rem;
+    text-align: center;
+    padding: 1.5rem;
+    background: #1a1a2e;
+    border-radius: 8px;
+    border: 1px solid #333;
+}
+
+#myRoomCode {
+    font-size: 1.5rem;
+    color: #00ffff;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+#playerList {
+    margin: 1rem 0;
+}
+
+.player-tag {
+    display: inline-block;
+    background: #ff00ff33;
+    border: 1px solid #ff00ff;
+    padding: 0.3rem 0.8rem;
+    margin: 0.2rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Game */
+#game {
+    background: #0a0a0f;
+}
+
+#gameContainer {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 20px;
+}
+
+.player-board {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.player-board.eliminated .board-wrapper {
+    opacity: 0.4;
+}
+
+.player-name {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.player-name.you {
+    color: #00ffff;
+}
+
+.board-wrapper {
+    display: flex;
+    gap: 10px;
+}
+
+.tetris-board {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 1px;
+    background: #111;
+    border: 2px solid #333;
+    padding: 2px;
+}
+
+/* Board sizes based on player count */
+.players-1 .tetris-board {
+    width: 300px;
+    height: 600px;
+}
+
+.players-2 .tetris-board {
+    width: 240px;
+    height: 480px;
+}
+
+.players-3 .tetris-board,
+.players-4 .tetris-board {
+    width: 180px;
+    height: 360px;
+}
+
+.cell {
+    background: #0a0a0f;
+    aspect-ratio: 1;
+}
+
+.cell.I { background: #00ffff; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.O { background: #ffff00; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.T { background: #aa00ff; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.S { background: #00ff00; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.Z { background: #ff0000; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.J { background: #0000ff; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.L { background: #ff8800; box-shadow: inset 0 0 10px rgba(255,255,255,0.3); }
+.cell.garbage { background: #444; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+.cell.ghost { background: rgba(255,255,255,0.15); }
+
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.next-piece, .hold-piece {
+    background: #111;
+    border: 2px solid #333;
+    padding: 10px;
+    width: 80px;
+}
+
+.players-1 .next-piece,
+.players-1 .hold-piece {
+    width: 100px;
+}
+
+.panel-label {
+    font-size: 0.7rem;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.mini-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+}
+
+.mini-cell {
+    aspect-ratio: 1;
+    background: #0a0a0f;
+}
+
+.mini-cell.I { background: #00ffff; }
+.mini-cell.O { background: #ffff00; }
+.mini-cell.T { background: #aa00ff; }
+.mini-cell.S { background: #00ff00; }
+.mini-cell.Z { background: #ff0000; }
+.mini-cell.J { background: #0000ff; }
+.mini-cell.L { background: #ff8800; }
+
+.stats {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+.stats div {
+    margin: 3px 0;
+}
+
+.stat-value {
+    color: #fff;
+    font-weight: bold;
+}
+
+/* Countdown */
+#countdown {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 8rem;
+    font-weight: bold;
+    color: #ff00ff;
+    text-shadow: 0 0 50px #ff00ff;
+    z-index: 100;
+}
+
+/* Game Over */
+#gameOver h1 {
+    font-size: 3rem;
+    margin-bottom: 2rem;
+    color: #ff0066;
+}
+
+#results {
+    margin-bottom: 2rem;
+    font-size: 1.5rem;
+}
+
+.result-entry {
+    margin: 0.5rem 0;
+    padding: 0.5rem 1rem;
+}
+
+.result-entry.winner {
+    color: #00ffff;
+    font-size: 2rem;
+}
+
+/* Controls hint */
+.controls-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #444;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.controls-hint kbd {
+    background: #222;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #333;
+}
